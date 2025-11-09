@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ===== ENUMS ===== */
+enum StockStatus { AVAILABLE PREORDER IN_TRANSIT }
+enum ModerationType { NEW_PRODUCT EDIT_PRODUCT }
+enum ModerationStatus { PENDING APPROVED REJECTED }
+enum OrderStatus {
+  PENDING_SELLER_CONFIRMATION
+  SELLER_CONFIRMED
+  PAID
+  FULFILLED
+  CANCELLED
+  CANCELLED_EXPIRED
+}
+enum SupportStatus { NEW IN_PROGRESS CLOSED }
+enum SupportActor   { SELLER BUYER ADMIN MODERATOR }
+
+/* ===== MODELS ===== */
+
+model Seller {
+  id                String   @id @default(cuid())
+  name              String
+  taxId             String?
+  commissionPercent Float?
+  logoUrl           String?
+  createdAt         DateTime @default(now())
+
+  products    Product[]
+  cities      City[]
+  warehouses  Warehouse[]
+  moderations Moderation[]
+  orderGroups OrderGroup[]
+}
+
+model Buyer {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  phone       String?
+  name        String?
+  companyName String?
+  inn         String?
+  kpp         String?
+  address     String?
+  avatarUrl   String?
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+
+  carts       Cart[]
+  orderGroups OrderGroup[]
+}
+
+model Category {
+  id       String   @id @default(cuid())
+  name     String   @unique
+  products Product[]
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  sellerId          String
+  categoryId        String
+  name              String
+  sku               String
+  description       String?
+  pricePerBoxSeller Int
+  stemsPerBox       Int
+  cutLengthCm       Int
+  color             String?
+  country           String?
+  photos            Json
+  stockStatus       StockStatus   @default(AVAILABLE)
+  sellerDiscountRub Int           @default(0)
+  sellerCashbackRub Int           @default(0)
+  published         Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  seller      Seller      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  moderations Moderation[]
+  stocks      Stock[]
+  orderItems  OrderItem[]
+
+  @@index([sku])
+}
+
+model Moderation {
+  id            String           @id @default(cuid())
+  type          ModerationType
+  status        ModerationStatus @default(PENDING)
+  sellerId      String
+  productId     String?
+  draft         Json
+  original      Json?
+  fieldsChanged String[]
+  rejectReason  String?
+  createdAt     DateTime         @default(now())
+  approvedAt    DateTime?
+
+  seller  Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+model City {
+  id        String   @id @default(cuid())
+  sellerId  String
+  name      String
+  createdAt DateTime @default(now())
+
+  seller     Seller     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  warehouses Warehouse[]
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  sellerId  String
+  cityId    String
+  name      String
+  createdAt DateTime @default(now())
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  city   City   @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  stocks Stock[]
+}
+
+model Stock {
+  warehouseId String
+  productId   String
+  qtyBoxes    Int      @default(0)
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([warehouseId, productId])
+}
+
+model MarketCommission {
+  id         String   @id @default(cuid())
+  scope      String   // GLOBAL | SELLER | CATEGORY | SELLER_CATEGORY
+  sellerId   String?
+  categoryId String?
+  percent    Float
+  createdAt  DateTime @default(now())
+}
+
+model GlobalCashback {
+  id        String   @id @default(cuid())
+  percent   Float    @default(1.5)
+  createdAt DateTime @default(now())
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  buyerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     CartItem[]
+
+  buyer Buyer @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@index([buyerId])
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  productId String
+  sellerId  String
+  qtyBoxes  Int
+  priceRub  Int
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  seller  Seller  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([cartId])
+}
+
+model OrderGroup {
+  id          String      @id @default(cuid())
+  buyerId     String
+  sellerId    String
+  status      OrderStatus @default(PENDING_SELLER_CONFIRMATION)
+  createdAt   DateTime    @default(now())
+  confirmBy   DateTime
+  totalRub    Int
+  cashbackRub Int         @default(0)
+
+  buyer  Buyer      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  seller Seller     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  items  OrderItem[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderGroupId String
+  productId    String
+  qtyBoxes     Int
+  priceRub     Int
+
+  group   OrderGroup @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([orderGroupId])
+}
+
+/* ===== Support (тикеты) ===== */
+model SupportTicket {
+  id            String        @id @default(cuid())
+  requesterId   String
+  subject       String
+  topic         String
+  status        SupportStatus @default(NEW)
+  lastMessageAt DateTime      @default(now())
+  messages      SupportMessage[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([requesterId])
+  @@index([status])
+}
+
+model SupportMessage {
+  id        String       @id @default(cuid())
+  ticketId  String
+  actor     SupportActor
+  body      String
+  createdAt DateTime      @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+/* ===== Баннеры ===== */
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  imageUrl  String
+  linkUrl   String?
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,802 @@
+diff --git a/src/components/Header.tsx b/src/components/Header.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/components/Header.tsx
+@@ -0,0 +1,51 @@
++'use client'
++
++import Link from 'next/link'
++import { useState } from 'react'
++
++export default function Header() {
++  const [open, setOpen] = useState(false)
++
++  return (
++    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
++      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
++        <Link className="font-semibold" href="/">YouFlora</Link>
++
++        <nav className="flex items-center gap-3 text-sm">
++          <Link href="/catalog">Каталог</Link>
++          <Link href="/account">Регистрация</Link>
++          <Link href="/cart">Корзина</Link>
++          {/* Админка остаётся как ссылка; пункта «Стать администратором» в меню нет */}
++          <Link href="/admin">Админка</Link>
++        </nav>
++
++        <div className="ml-auto w-[280px]">
++          <input className="input w-full" placeholder="Поиск по каталогу…" />
++        </div>
++
++        <div className="relative">
++          <button className="btn" onClick={() => setOpen(v => !v)}>Регистрация</button>
++          {open && (
++            <div className="absolute right-0 mt-2 w-56 rounded border bg-white shadow">
++              <Link className="block px-3 py-2 hover:bg-gray-50" href="/auth/register-buyer">Стать покупателем</Link>
++              <Link className="block px-3 py-2 hover:bg-gray-50" href="/auth/register-seller">Стать продавцом</Link>
++            </div>
++          )}
++        </div>
++      </div>
++    </header>
++  )
++}
+diff --git a/src/app/layout.css b/src/app/layout.css
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/layout.css
+@@ -0,0 +1,33 @@
++/* Базовые утилиты, чтобы убрать ошибку импорта и дать каркас */
++.container-app {
++  max-width: 72rem;
++  margin-left: auto;
++  margin-right: auto;
++  padding-left: 1rem;
++  padding-right: 1rem;
++}
++.input {
++  display: block;
++  width: 100%;
++  border: 1px solid #e5e7eb;
++  border-radius: .5rem;
++  padding: .5rem .75rem;
++}
++.btn {
++  border: 1px solid #e5e7eb;
++  border-radius: .5rem;
++  padding: .5rem .75rem;
++  background: white;
++}
++.btn-primary {
++  background: #111827;
++  color: #fff;
++  border-color: #111827;
++}
++.card {
++  background: #fff;
++  border: 1px solid #e5e7eb;
++  border-radius: .75rem;
++  padding: 1rem;
++}
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/layout.tsx
+@@ -0,0 +1,24 @@
++import type { Metadata } from 'next'
++import Header from '@/components/Header'
++import './layout.css'
++
++export const metadata: Metadata = {
++  title: 'YouFlora B2B',
++  description: 'Маркетплейс цветов для юрлиц: от 1 коробки',
++  robots: { index: false },
++}
++
++export default function RootLayout({ children }: { children: React.ReactNode }) {
++  return (
++    <html lang="ru">
++      <body>
++        <Header />
++        <main className="container-app py-6">{children}</main>
++      </body>
++    </html>
++  )
++}
+diff --git a/src/components/BannerCarousel.tsx b/src/components/BannerCarousel.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/components/BannerCarousel.tsx
+@@ -0,0 +1,40 @@
++import Image from 'next/image'
++
++type Banner = {
++  id: string
++  title: string
++  imageUrl: string
++  linkUrl: string | null
++}
++
++export default async function BannerCarousel() {
++  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || '/api/v1'}/banners`, {
++    next: { revalidate: 60 },
++  })
++  const data = await res.json().catch(() => ({ items: [] }))
++  const items: Banner[] = Array.isArray(data?.items) ? data.items : []
++
++  if (!items.length) return null
++
++  return (
++    <div className="relative overflow-x-auto">
++      <div className="flex gap-3">
++        {items.map(b => (
++          <a key={b.id} href={b.linkUrl ?? '#'} className="block min-w-[320px] w-full">
++            <Image
++              src={b.imageUrl}
++              alt={b.title}
++              width={1200}
++              height={360}
++              className="w-full h-auto rounded-lg border"
++              unoptimized
++            />
++          </a>
++        ))}
++      </div>
++    </div>
++  )
++}
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/page.tsx
+@@ -0,0 +1,11 @@
++import BannerCarousel from '@/components/BannerCarousel'
++
++export default async function HomePage() {
++  return (
++    <div className="p-6 space-y-8">
++      <BannerCarousel />
++      {/* здесь ваши подборки: новинки, со скидкой и т.п. */}
++    </div>
++  )
++}
+diff --git a/src/lib/prisma.ts b/src/lib/prisma.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/lib/prisma.ts
+@@ -0,0 +1,13 @@
++import { PrismaClient } from '@prisma/client'
++
++const globalForPrisma = global as unknown as { prisma?: PrismaClient }
++
++export const prisma =
++  globalForPrisma.prisma ??
++  new PrismaClient({
++    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
++  })
++
++if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+diff --git a/src/app/api/v1/banners/route.ts b/src/app/api/v1/banners/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/banners/route.ts
+@@ -0,0 +1,28 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function GET() {
++  const items = await prisma.banner.findMany({
++    where: { isActive: true },
++    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
++  })
++  return NextResponse.json({ items })
++}
++
++export async function POST(req: Request) {
++  try {
++    const body = await req.json().catch(() => ({}))
++    const { title, imageUrl, linkUrl, isActive = true, sortOrder = 0 } = body || {}
++    if (!title || !imageUrl) {
++      return NextResponse.json({ error: 'title and imageUrl are required' }, { status: 400 })
++    }
++    const created = await prisma.banner.create({
++      data: { title, imageUrl, linkUrl: linkUrl ?? null, isActive: !!isActive, sortOrder: Number(sortOrder) || 0 },
++    })
++    return NextResponse.json({ item: created })
++  } catch {
++    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
++  }
++}
+diff --git a/src/app/api/v1/banners/[id]/route.ts b/src/app/api/v1/banners/[id]/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/banners/[id]/route.ts
+@@ -0,0 +1,32 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function PATCH(req: Request, { params }: { params: { id: string } }) {
++  try {
++    const body = await req.json().catch(() => ({}))
++    const { title, imageUrl, linkUrl, isActive, sortOrder } = body || {}
++    const updated = await prisma.banner.update({
++      where: { id: params.id },
++      data: {
++        ...(title !== undefined ? { title } : {}),
++        ...(imageUrl !== undefined ? { imageUrl } : {}),
++        ...(linkUrl !== undefined ? { linkUrl } : {}),
++        ...(isActive !== undefined ? { isActive: !!isActive } : {}),
++        ...(sortOrder !== undefined ? { sortOrder: Number(sortOrder) || 0 } : {}),
++      },
++    })
++    return NextResponse.json({ item: updated })
++  } catch {
++    return NextResponse.json({ error: 'Not found' }, { status: 404 })
++  }
++}
++
++export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
++  try {
++    await prisma.banner.delete({ where: { id: params.id } })
++    return NextResponse.json({ ok: true })
++  } catch {
++    return NextResponse.json({ error: 'Not found' }, { status: 404 })
++  }
++}
+diff --git a/src/app/api/upload/route.ts b/src/app/api/upload/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/upload/route.ts
+@@ -0,0 +1,33 @@
++import { NextResponse } from 'next/server'
++import { writeFile, mkdir } from 'fs/promises'
++import { join } from 'path'
++import { randomUUID } from 'crypto'
++
++export async function POST(req: Request) {
++  try {
++    const form = await req.formData()
++    const file = form.get('file') as unknown as File
++    if (!file) return NextResponse.json({ error: 'file is required' }, { status: 400 })
++
++    const bytes = Buffer.from(await file.arrayBuffer())
++    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'banners')
++    await mkdir(uploadsDir, { recursive: true })
++
++    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase()
++    const name = `${randomUUID()}.${ext}`
++    const full = join(uploadsDir, name)
++    await writeFile(full, bytes)
++
++    const publicUrl = `/uploads/banners/${name}`
++    return NextResponse.json({ url: publicUrl })
++  } catch {
++    return NextResponse.json({ error: 'Upload error' }, { status: 500 })
++  }
++}
+diff --git a/src/app/api/v1/support/tickets/route.ts b/src/app/api/v1/support/tickets/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/support/tickets/route.ts
+@@ -0,0 +1,61 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function GET(req: Request) {
++  const { searchParams } = new URL(req.url)
++  const requesterId = searchParams.get('requesterId') || undefined
++  const where = requesterId ? { requesterId } : {}
++  const items = await prisma.supportTicket.findMany({
++    where,
++    orderBy: { createdAt: 'desc' },
++    include: { messages: { orderBy: { createdAt: 'asc' } } },
++  })
++  return NextResponse.json({ items })
++}
++
++export async function POST(req: Request) {
++  try {
++    const body = await req.json().catch(() => ({}))
++    const requesterId = String(body?.requesterId ?? '').trim()
++    const requesterRole = (body?.requesterRole ?? 'SELLER') as 'BUYER'|'SELLER'|'ADMIN'
++    const subject = String(body?.subject ?? '').trim()
++    const message = String(body?.message ?? '').trim()
++    const topic = String(body?.topic ?? subject || 'GENERAL').trim()
++    if (!requesterId) return NextResponse.json({ error: 'requesterId is required' }, { status: 400 })
++    if (!subject) return NextResponse.json({ error: 'subject is required' }, { status: 400 })
++    if (!message) return NextResponse.json({ error: 'message is required' }, { status: 400 })
++
++    const created = await prisma.$transaction(async (tx) => {
++      const t = await tx.supportTicket.create({
++        data: {
++          requesterId,
++          requesterRole,
++          subject,
++          topic,
++          status: 'NEW',
++        },
++      })
++      await tx.supportMessage.create({
++        data: {
++          ticketId: t.id,
++          authorId: requesterId,
++          authorRole: requesterRole,
++          text: message,
++        },
++      })
++      return t
++    })
++
++    return NextResponse.json({ item: created })
++  } catch {
++    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
++  }
++}
+diff --git a/src/app/api/v1/admin/support/route.ts b/src/app/api/v1/admin/support/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/admin/support/route.ts
+@@ -0,0 +1,25 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function GET(req: Request) {
++  const { searchParams } = new URL(req.url)
++  const status = (searchParams.get('status') || 'ALL').toUpperCase()
++  const where = status === 'ALL' ? {} : { status }
++  const items = await prisma.supportTicket.findMany({
++    where,
++    orderBy: { createdAt: 'desc' },
++    include: { messages: { orderBy: { createdAt: 'asc' }, take: 1 } },
++  })
++  return NextResponse.json({
++    items,
++    counts: {
++      NEW: await prisma.supportTicket.count({ where: { status: 'NEW' } }),
++      IN_PROGRESS: await prisma.supportTicket.count({ where: { status: 'IN_PROGRESS' } }),
++      CLOSED: await prisma.supportTicket.count({ where: { status: 'CLOSED' } }),
++      ALL: await prisma.supportTicket.count(),
++    },
++  })
++}
+diff --git a/src/app/seller/support/new/page.tsx b/src/app/seller/support/new/page.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/seller/support/new/page.tsx
+@@ -0,0 +1,79 @@
++'use client'
++import { useEffect, useState } from 'react'
++
++export default function SellerSupportNewPage() {
++  const [subject, setSubject] = useState('')
++  const [message, setMessage] = useState('')
++  const [error, setError] = useState<string | null>(null)
++  const [ok, setOk] = useState(false)
++  const [requesterId, setRequesterId] = useState('s-ec')
++
++  useEffect(() => {
++    try {
++      const raw = localStorage.getItem('seller_profile')
++      if (raw) {
++        const p = JSON.parse(raw)
++        if (p?.id) setRequesterId(String(p.id))
++      }
++    } catch {}
++  }, [])
++
++  async function submit(e: React.FormEvent) {
++    e.preventDefault()
++    setError(null); setOk(false)
++    try {
++      const res = await fetch('/api/v1/support/tickets', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++          requesterId,
++          requesterRole: 'SELLER',
++          subject,
++          message,
++          topic: subject || 'GENERAL',
++        }),
++      })
++      const j = await res.json().catch(() => ({}))
++      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++      setOk(true); setSubject(''); setMessage('')
++    } catch (err:any) {
++      setError(err?.message || 'Не удалось отправить')
++    }
++  }
++
++  return (
++    <div>
++      <h1 className="mb-6 text-2xl font-semibold">Обращение в поддержку</h1>
++      <div className="card">
++        <div className="mb-4 text-sm text-gray-500">
++          Отправитель (продавец): <span className="font-mono">{requesterId}</span>
++        </div>
++        <form onSubmit={submit} className="max-w-3xl space-y-4">
++          <div>
++            <label className="mb-1 block text-sm font-medium">Тема</label>
++            <input className="w-full rounded border px-3 py-2"
++                  value={subject} onChange={e=>setSubject(e.target.value)}
++                  placeholder="Коротко: в чём вопрос?" />
++          </div>
++          <div>
++            <label className="mb-1 block text-sm font-medium">Сообщение</label>
++            <textarea className="h-48 w-full rounded border px-3 py-2"
++                      value={message} onChange={e=>setMessage(e.target.value)}
++                      placeholder="Опишите проблему подробнее…" />
++          </div>
++          <button type="submit" className="btn btn-primary">Отправить</button>
++          {ok && <div className="mt-3 text-green-600">Обращение создано</div>}
++          {error && <div className="mt-3 text-red-600">Не удалось отправить: {error}</div>}
++        </form>
++      </div>
++    </div>
++  )
++}
+diff --git a/src/app/api/v1/moderations/route.ts b/src/app/api/v1/moderations/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/moderations/route.ts
+@@ -0,0 +1,16 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function GET(req: Request) {
++  const { searchParams } = new URL(req.url)
++  const status = (searchParams.get('status') || 'PENDING').toUpperCase()
++  const where = status ? { status } : undefined
++  const items = await prisma.moderation.findMany({
++    where,
++    orderBy: { createdAt: 'desc' },
++  })
++  return NextResponse.json({ items })
++}
+diff --git a/src/app/api/v1/moderations/[id]/approve/route.ts b/src/app/api/v1/moderations/[id]/approve/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/moderations/[id]/approve/route.ts
+@@ -0,0 +1,58 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function PATCH(_req: Request, { params }: { params: { id: string } }) {
++  try {
++    const m = await prisma.moderation.findUnique({ where: { id: params.id } })
++    if (!m) return NextResponse.json({ error: 'Not found' }, { status: 404 })
++
++    let productId = m.productId
++    if (m.type === 'NEW_PRODUCT') {
++      const draft: any = m.draft || {}
++      const p = await prisma.product.create({
++        data: {
++          sellerId: draft.sellerId,
++          categoryId: draft.categoryId,
++          name: draft.name,
++          sku: draft.sku ?? `SKU-${Date.now()}`,
++          description: draft.description ?? null,
++          pricePerBoxSeller: Number(draft.pricePerBoxSeller) || 0,
++          stemsPerBox: Number(draft.stemsPerBox) || 0,
++          cutLengthCm: Number(draft.cutLengthCm) || 0,
++          color: draft.color ?? null,
++          country: draft.country ?? null,
++          photos: draft.photos ?? [],
++          published: true,
++        },
++      })
++      productId = p.id
++    } else if (m.type === 'EDIT_PRODUCT' && m.productId) {
++      const draft: any = m.draft || {}
++      await prisma.product.update({
++        where: { id: m.productId },
++        data: {
++          ...(draft.name ? { name: draft.name } : {}),
++          ...(draft.description !== undefined ? { description: draft.description } : {}),
++          ...(draft.pricePerBoxSeller !== undefined ? { pricePerBoxSeller: Number(draft.pricePerBoxSeller) || 0 } : {}),
++          ...(draft.stemsPerBox !== undefined ? { stemsPerBox: Number(draft.stemsPerBox) || 0 } : {}),
++          ...(draft.cutLengthCm !== undefined ? { cutLengthCm: Number(draft.cutLengthCm) || 0 } : {}),
++          ...(draft.color !== undefined ? { color: draft.color } : {}),
++          ...(draft.country !== undefined ? { country: draft.country } : {}),
++          ...(draft.photos !== undefined ? { photos: draft.photos } : {}),
++          published: true,
++        },
++      })
++    }
++
++    const updated = await prisma.moderation.update({
++      where: { id: params.id },
++      data: { status: 'APPROVED', approvedAt: new Date(), productId: productId ?? undefined },
++    })
++
++    return NextResponse.json({ item: updated })
++  } catch {
++    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
++  }
++}
+diff --git a/src/app/api/v1/moderations/[id]/reject/route.ts b/src/app/api/v1/moderations/[id]/reject/route.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/api/v1/moderations/[id]/reject/route.ts
+@@ -0,0 +1,17 @@
++import { NextResponse } from 'next/server'
++import { prisma } from '@/lib/prisma'
++
++export async function PATCH(req: Request, { params }: { params: { id: string } }) {
++  try {
++    const body = await req.json().catch(() => ({}))
++    const reason = String(body?.reason ?? '').trim()
++    const updated = await prisma.moderation.update({
++      where: { id: params.id },
++      data: { status: 'REJECTED', rejectReason: reason || null },
++    })
++    return NextResponse.json({ item: updated })
++  } catch {
++    return NextResponse.json({ error: 'Not found' }, { status: 404 })
++  }
++}
+diff --git a/src/app/admin/moderation/page.tsx b/src/app/admin/moderation/page.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/admin/moderation/page.tsx
+@@ -0,0 +1,141 @@
++'use client'
++
++import { useEffect, useState } from 'react'
++
++type Moderation = {
++  id: string
++  type: 'NEW_PRODUCT' | 'EDIT_PRODUCT'
++  status: 'PENDING' | 'APPROVED' | 'REJECTED'
++  sellerId: string
++  productId?: string | null
++  createdAt: string
++}
++
++async function apiGet(path: string) {
++  const res = await fetch(`/api/v1${path}`)
++  if (!res.ok) throw new Error(`HTTP ${res.status}`)
++  return res.json()
++}
++async function apiPatch(path: string, body: any) {
++  const res = await fetch(`/api/v1${path}`, {
++    method: 'PATCH',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify(body ?? {}),
++  })
++  const j = await res.json().catch(() => ({}))
++  if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++  return j
++}
++
++export default function AdminModerationPage() {
++  const [rows, setRows] = useState<Moderation[]>([])
++  const [tab, setTab] = useState<'PENDING'|'APPROVED'|'REJECTED'>('PENDING')
++  const [err, setErr] = useState<string|null>(null)
++  const [rejectId, setRejectId] = useState<string|null>(null)
++  const [reason, setReason] = useState('')
++
++  async function load() {
++    setErr(null)
++    try {
++      const j = await apiGet(`/moderations?status=${tab}`)
++      setRows(Array.isArray(j?.items) ? j.items : [])
++    } catch (e: any) {
++      setErr(e?.message || 'Load error')
++    }
++  }
++  useEffect(() => { load() }, [tab])
++
++  const approve = async (id: string) => { await apiPatch(`/moderations/${id}/approve`, {}); await load() }
++  const openReject = (id: string) => { setRejectId(id); setReason('') }
++  const doReject = async () => {
++    if (!rejectId) return
++    await apiPatch(`/moderations/${rejectId}/reject`, { reason })
++    setRejectId(null); setReason(''); await load()
++  }
++
++  return (
++    <div className="space-y-4">
++      <h1 className="text-xl font-semibold">Модерация товаров</h1>
++
++      <div className="flex gap-2">
++        {(['PENDING','APPROVED','REJECTED'] as const).map(s => (
++          <button key={s} className={`btn ${tab===s?'btn-primary':''}`} onClick={() => setTab(s)}>
++            {s}
++          </button>
++        ))}
++      </div>
++
++      {err && <div className="text-red-600">{err}</div>}
++
++      <table className="min-w-full text-sm">
++        <thead>
++          <tr className="text-left border-b">
++            <th className="p-2">ID</th>
++            <th className="p-2">Тип</th>
++            <th className="p-2">Продавец</th>
++            <th className="p-2">Товар</th>
++            <th className="p-2">Создано</th>
++            <th className="p-2">Действия</th>
++          </tr>
++        </thead>
++        <tbody>
++          {rows.map(it => (
++            <tr key={it.id} className="border-b">
++              <td className="p-2 font-mono">{it.id.slice(0,8)}</td>
++              <td className="p-2">{it.type}</td>
++              <td className="p-2">{it.sellerId}</td>
++              <td className="p-2">{it.productId ?? '—'}</td>
++              <td className="p-2">{new Date(it.createdAt).toLocaleString()}</td>
++              <td className="p-2">
++                {it.status === 'PENDING' ? (
++                  <div className="flex gap-2">
++                    <button className="btn btn-primary" onClick={() => approve(it.id)}>Одобрить</button>
++                    <button className="btn" onClick={() => openReject(it.id)}>Отклонить</button>
++                  </div>
++                ) : <span>{it.status}</span>}
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++
++      {rejectId && (
++        <div className="card space-y-3">
++          <div className="font-medium">Причина отклонения</div>
++          <textarea className="w-full rounded border px-3 py-2" value={reason} onChange={e => setReason(e.target.value)} />
++          <div className="flex gap-2">
++            <button className="btn btn-primary" onClick={doReject}>Отклонить</button>
++            <button className="btn" onClick={() => setRejectId(null)}>Отмена</button>
++          </div>
++        </div>
++      )}
++    </div>
++  )
++}
+diff --git a/src/app/admin/banners/page.tsx b/src/app/admin/banners/page.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/app/admin/banners/page.tsx
+@@ -0,0 +1,142 @@
++'use client'
++
++import { useEffect, useState } from 'react'
++
++type Banner = {
++  id: string
++  title: string
++  imageUrl: string
++  linkUrl: string | null
++  isActive: boolean
++  sortOrder: number
++  createdAt: string
++}
++
++export default function AdminBannersPage() {
++  const [items, setItems] = useState<Banner[]>([])
++  const [title, setTitle] = useState('')
++  const [linkUrl, setLinkUrl] = useState('')
++  const [file, setFile] = useState<File | null>(null)
++  const [err, setErr] = useState<string | null>(null)
++
++  async function load() {
++    const res = await fetch('/api/v1/banners')
++    const j = await res.json()
++    setItems(Array.isArray(j?.items) ? j.items : [])
++  }
++  useEffect(() => { load() }, [])
++
++  async function uploadFile(): Promise<string> {
++    if (!file) throw new Error('Выберите файл')
++    const fd = new FormData()
++    fd.append('file', file)
++    const res = await fetch('/api/upload', { method: 'POST', body: fd })
++    const j = await res.json()
++    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++    return j.url as string
++  }
++
++  async function createBanner() {
++    setErr(null)
++    try {
++      const imageUrl = await uploadFile()
++      const res = await fetch('/api/v1/banners', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({ title, linkUrl: linkUrl || null, imageUrl, isActive: true, sortOrder: 0 }),
++      })
++      const j = await res.json()
++      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++      setTitle(''); setLinkUrl(''); setFile(null)
++      await load()
++    } catch (e: any) {
++      setErr(e?.message || 'Не удалось создать баннер')
++    }
++  }
++
++  async function updateBanner(id: string, patch: Partial<Banner>) {
++    const res = await fetch(`/api/v1/banners/${id}`, {
++      method: 'PATCH',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify(patch),
++    })
++    const j = await res.json().catch(() => ({}))
++    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++    await load()
++  }
++
++  async function removeBanner(id: string) {
++    const res = await fetch(`/api/v1/banners/${id}`, { method: 'DELETE' })
++    const j = await res.json().catch(() => ({}))
++    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
++    await load()
++  }
++
++  return (
++    <div className="space-y-6">
++      <h1 className="text-xl font-semibold">Баннеры</h1>
++
++      <div className="card space-y-3">
++        <div className="font-medium">Создать баннер</div>
++        <input className="input" placeholder="Заголовок" value={title} onChange={e => setTitle(e.target.value)} />
++        <input className="input" placeholder="Ссылка (необязательно)" value={linkUrl} onChange={e => setLinkUrl(e.target.value)} />
++        <input type="file" onChange={e => setFile(e.target.files?.[0] || null)} />
++        <button className="btn btn-primary" onClick={createBanner}>Добавить</button>
++        {err && <div className="text-red-600">{err}</div>}
++      </div>
++
++      <table className="min-w-full text-sm">
++        <thead>
++          <tr className="text-left border-b">
++            <th className="p-2">ID</th>
++            <th className="p-2">Заголовок</th>
++            <th className="p-2">Ссылка</th>
++            <th className="p-2">Активен</th>
++            <th className="p-2">Порядок</th>
++            <th className="p-2">Действия</th>
++          </tr>
++        </thead>
++        <tbody>
++          {items.map(b => (
++            <tr key={b.id} className="border-b">
++              <td className="p-2 font-mono">{b.id.slice(0,8)}</td>
++              <td className="p-2">{b.title}</td>
++              <td className="p-2">{b.linkUrl ?? '—'}</td>
++              <td className="p-2">
++                <input type="checkbox" checked={b.isActive} onChange={e => updateBanner(b.id, { isActive: e.target.checked })} />
++              </td>
++              <td className="p-2">
++                <input
++                  className="input w-24"
++                  value={String(b.sortOrder ?? 0)}
++                  onChange={e => updateBanner(b.id, { sortOrder: Number(e.target.value) || 0 })}
++                />
++              </td>
++              <td className="p-2">
++                <button className="btn" onClick={() => removeBanner(b.id)}>Удалить</button>
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
++  )
++}

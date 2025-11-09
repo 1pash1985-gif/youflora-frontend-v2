@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  pg:
+    image: postgres:15-alpine
+    container_name: youflora_pg
+    environment:
+      POSTGRES_USER: youflora
+      POSTGRES_PASSWORD: youflora
+      POSTGRES_DB: youflora
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: youflora_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@youflora.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+volumes:
+  pgdata:

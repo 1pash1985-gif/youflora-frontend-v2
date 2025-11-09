@@ -1,0 +1,1 @@
+export default function AdminRoot(){ return <div className='card p-6'>Выберите раздел слева.</div> }

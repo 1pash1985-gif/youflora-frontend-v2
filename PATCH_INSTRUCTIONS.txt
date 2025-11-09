@@ -1,0 +1,25 @@
+PATCH: initWarehouseSeedIfEmpty
+
+1) Copy file to your project (allow overwrite):
+   youflora-frontend/src/lib/store.warehouse.ts  ->  <your_project>/src/lib/store.warehouse.ts
+
+2) Edit <your_project>/src/app/seller/products/page.tsx
+   - Make sure 'use client' is the VERY FIRST line.
+   - Ensure the import includes initWarehouseSeedIfEmpty and uses a relative path:
+
+     import {
+       getSellerCities, getWarehousesByCity, setStock, initWarehouseSeedIfEmpty
+     } from '../../../lib/store.warehouse'
+
+   - Ensure init call is guarded (optional, but safe):
+
+     initCatalogIfEmpty(seed);
+     if (typeof window !== 'undefined' && typeof (initWarehouseSeedIfEmpty as any) === 'function') {
+       initWarehouseSeedIfEmpty();
+     }
+
+3) Rebuild:
+   npm i
+   # optional clean
+   # rm -rf .next
+   npm run dev

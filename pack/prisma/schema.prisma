@@ -1,0 +1,196 @@
+// prisma/schema.prisma
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client { provider = "prisma-client-js" }
+
+enum StockStatus { AVAILABLE PREORDER IN_TRANSIT }
+enum ModerationType { NEW_PRODUCT EDIT_PRODUCT }
+enum ModerationStatus { PENDING APPROVED REJECTED }
+enum OrderStatus { PENDING_SELLER_CONFIRMATION SELLER_CONFIRMED PAID FULFILLED CANCELLED CANCELLED_EXPIRED }
+enum PaymentStatus { AUTHORIZED CAPTURED CANCELED FAILED }
+
+model Seller {
+  id                 String       @id @default(cuid())
+  name               String
+  taxId              String?
+  commissionPercent  Float?
+  createdAt          DateTime     @default(now())
+  products           Product[]
+  cities             City[]
+  warehouses         Warehouse[]
+  orderGroups        OrderGroup[]
+}
+
+model Buyer {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String?
+  carts     Cart[]
+  orders    Order[]
+}
+
+model City {
+  id         String      @id @default(cuid())
+  seller     Seller      @relation(fields: [sellerId], references: [id])
+  sellerId   String
+  name       String
+  warehouses Warehouse[]
+}
+
+model Warehouse {
+  id         String     @id @default(cuid())
+  seller     Seller     @relation(fields: [sellerId], references: [id])
+  sellerId   String
+  city       City       @relation(fields: [cityId], references: [id])
+  cityId     String
+  name       String
+  stock      Stock[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  products  Product[]
+}
+
+model Product {
+  id                 String     @id @default(cuid())
+  seller             Seller     @relation(fields: [sellerId], references: [id])
+  sellerId           String
+  category           Category   @relation(fields: [categoryId], references: [id])
+  categoryId         String
+  name               String
+  sku                String
+  description        String?
+  photos             Json?
+  stemsPerBox        Int?
+  pricePerBoxSeller  Int
+  sellerDiscountRub  Int        @default(0)
+  sellerCashbackRub  Int        @default(0)
+  cutLengthCm        Int?
+  color              String?
+  country            String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  stock              Stock[]
+  orderItems         OrderItem[]
+  cartItems          CartItem[]
+}
+
+model Stock {
+  id          String      @id @default(cuid())
+  warehouse   Warehouse   @relation(fields: [warehouseId], references: [id])
+  warehouseId String
+  product     Product     @relation(fields: [productId], references: [id])
+  productId   String
+  qty         Int         @default(0)
+  reserved    Int         @default(0)
+  status      StockStatus @default(AVAILABLE)
+  eta         DateTime?
+  @@unique([warehouseId, productId])
+}
+
+model Moderation {
+  id            String            @id @default(cuid())
+  type          ModerationType
+  status        ModerationStatus  @default(PENDING)
+  seller        Seller            @relation(fields: [sellerId], references: [id])
+  sellerId      String
+  product       Product?          @relation(fields: [productId], references: [id])
+  productId     String?
+  originalJson  Json?
+  draftJson     Json?
+  fieldsChanged Json?
+  createdAt     DateTime          @default(now())
+  approvedAt    DateTime?
+  rejectReason  String?
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  buyer     Buyer      @relation(fields: [buyerId], references: [id])
+  buyerId   String
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  @@index([buyerId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  cartId    String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  qty       Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id                      String       @id @default(cuid())
+  buyer                  Buyer        @relation(fields: [buyerId], references: [id])
+  buyerId                String
+  status                 OrderStatus  @default(PENDING_SELLER_CONFIRMATION)
+  createdAt              DateTime     @default(now())
+  expiresAt              DateTime
+  deliveryMethod         String?
+  paymentMethod          String?
+  addressJson            Json?
+  groups                 OrderGroup[]
+  payment                Payment?
+  subtotal               Int          @default(0)
+  discountTotal          Int          @default(0)
+  cashbackGlobalApplied  Int          @default(0)
+  cashbackSellerApplied  Int          @default(0)
+  cashbackEarnedGlobal   Int          @default(0)
+  cashbackEarnedSeller   Int          @default(0)
+}
+
+model OrderGroup {
+  id             String      @id @default(cuid())
+  order          Order       @relation(fields: [orderId], references: [id])
+  orderId        String
+  seller         Seller      @relation(fields: [sellerId], references: [id])
+  sellerId       String
+  status         String      @default("PENDING")
+  items          OrderItem[]
+  subtotal       Int         @default(0)
+  commissionPct  Float       @default(0)
+  cashbackApplied Int        @default(0)
+  cashbackEarned  Int        @default(0)
+}
+
+model OrderItem {
+  id                 String     @id @default(cuid())
+  group              OrderGroup @relation(fields: [groupId], references: [id])
+  groupId            String
+  product            Product    @relation(fields: [productId], references: [id])
+  productId          String
+  qty                Int
+  stemsPerBox        Int?
+  pricePerBoxSeller  Int
+  discountRub        Int        @default(0)
+  commissionPct      Float      @default(0)
+  unitPrice          Int
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  order      Order         @relation(fields: [orderId], references: [id])
+  orderId    String        @unique
+  provider   String        @default("mock")
+  amount     Int
+  currency   String        @default("RUB")
+  status     PaymentStatus @default(AUTHORIZED)
+  createdAt  DateTime      @default(now())
+  capturedAt DateTime?
+}
+
+model MarketplaceConfig {
+  id                      String  @id @default("main")
+  globalCommissionPercent Float   @default(10)
+  globalCashbackPercent   Float   @default(1.5)
+  confirmHoldMinutes      Int     @default(120)
+  updatedAt               DateTime @updatedAt
+}

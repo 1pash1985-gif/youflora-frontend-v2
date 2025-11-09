@@ -1,0 +1,1 @@
+export default function SellerBalance(){ return <div className='card p-6'>Баланс продавца — заглушка (этап 2).</div> }

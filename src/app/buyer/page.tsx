@@ -1,0 +1,1 @@
+export default function BuyerRoot(){ return <div className='card p-6'>Выберите раздел слева.</div> }

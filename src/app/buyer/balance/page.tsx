@@ -1,0 +1,1 @@
+export default function BuyerBalance(){ return <div className='card p-6'>Баланс (этап 2) — заглушка.</div> }
