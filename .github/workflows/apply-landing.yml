@@ -1,0 +1,283 @@
+name: apply-landing
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Base branch to patch'
+        default: 'main'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.base }}
+
+      - name: Show git info (debug)
+        run: |
+          git --version
+          git status
+          git branch -vv
+          git remote -v
+
+      - name: Configure git author
+        run: |
+          git config user.name  "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      # ------- Пишем файлы главной страницы -------
+      - name: Write landing files
+        run: |
+          mkdir -p src/components src/app/api/v1/banners src/app public/images
+
+          # Header.tsx
+          cat > src/components/Header.tsx <<'TS'
+          'use client'
+          import Link from 'next/link'
+
+          /** Именованный и дефолтный экспорт */
+          export function Header() {
+            return (
+              <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+                  <Link className="font-semibold" href="/">YouFlora</Link>
+                  <nav className="flex items-center gap-3 text-sm">
+                    <Link href="/catalog">Каталог</Link>
+                    <Link href="/account">Регистрация</Link>
+                    <Link href="/favorites">Избранное</Link>
+                    <Link href="/cart">Корзина</Link>
+                    <Link href="/admin">Админка</Link>
+                  </nav>
+                  <div className="ml-auto w-[280px]">
+                    <input className="input w-full" placeholder="Поиск по каталогу…" />
+                  </div>
+                </div>
+              </header>
+            )
+          }
+          export default Header
+          TS
+
+          # Footer.tsx
+          cat > src/components/Footer.tsx <<'TS'
+          import Link from 'next/link'
+
+          export default function Footer() {
+            return (
+              <footer className="border-t bg-white">
+                <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
+                  <div className="space-y-3">
+                    <div className="font-semibold">YouFlora — оптовая продажа цветов</div>
+                    <p className="text-gray-600">
+                      Свежие поставки, конкурентные цены и честный сервис. Работаем с юрлицами от 1 коробки.
+                    </p>
+                    <div className="text-gray-500">© {new Date().getFullYear()} YouFlora</div>
+                  </div>
+                  <div>
+                    <div className="font-semibold mb-3">Каталог букетов</div>
+                    <ul className="space-y-2 text-gray-700">
+                      <li><Link href="/catalog">Предзаказ</Link></li>
+                      <li><Link href="/catalog">Европа</Link></li>
+                      <li><Link href="/catalog">Китай</Link></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="font-semibold mb-3">Помощь</div>
+                    <ul className="space-y-2 text-gray-700">
+                      <li><Link href="/delivery">Доставка</Link></li>
+                      <li><Link href="/payment">Оплата</Link></li>
+                      <li><Link href="/faq">FAQ</Link></li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="font-semibold mb-3">О нас</div>
+                    <ul className="space-y-2 text-gray-700">
+                      <li><Link href="/about">О компании</Link></li>
+                      <li><Link href="/contacts">Контакты</Link></li>
+                      <li><Link href="/blog">Блог</Link></li>
+                    </ul>
+                  </div>
+                </div>
+              </footer>
+            )
+          }
+          TS
+
+          # BannerCarousel.tsx
+          cat > src/components/BannerCarousel.tsx <<'TS'
+          import Image from 'next/image'
+          import Link from 'next/link'
+          import { prisma } from '@/lib/prisma'
+
+          /**
+           * Серверный компонент: берёт активные баннеры из БД.
+           * Если пусто — рендерит дефолтную заставку.
+           */
+          export default async function BannerCarousel() {
+            let banners: { id: string, title: string | null, subtitle: string | null, imageUrl: string, linkUrl: string | null }[] = []
+            try {
+              banners = await prisma.banner.findMany({
+                where: { isActive: true },
+                orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+                select: { id: true, title: true, subtitle: true, imageUrl: true, linkUrl: true }
+              })
+            } catch {}
+
+            if (!banners || banners.length === 0) {
+              banners = [{
+                id: 'fallback',
+                title: 'Добро пожаловать в YouFlora',
+                subtitle: null,
+                imageUrl: '/images/hero-fallback.png',
+                linkUrl: '/catalog'
+              }]
+            }
+
+            return (
+              <section className="relative overflow-hidden rounded-lg border bg-gray-50">
+                <div className="relative aspect-[16/6] w-full">
+                  {banners.map((b, i) => (
+                    <div key={b.id} className="absolute inset-0">
+                      <Image
+                        src={b.imageUrl}
+                        alt={b.title || 'YouFlora'}
+                        fill
+                        className="object-cover"
+                        priority={i === 0}
+                      />
+                      <div className="absolute inset-0 bg-black/20" />
+                      <div className="absolute left-8 top-1/2 -translate-y-1/2 text-white max-w-xl">
+                        {b.title && <h1 className="text-3xl md:text-5xl font-semibold mb-3 drop-shadow">{b.title}</h1>}
+                        {b.subtitle && <p className="mb-6 opacity-90">{b.subtitle}</p>}
+                        {b.linkUrl && (
+                          <Link href={b.linkUrl} className="btn btn-primary">В каталог</Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )
+          }
+          TS
+
+          # API: /api/v1/banners
+          cat > src/app/api/v1/banners/route.ts <<'TS'
+          import { NextResponse } from 'next/server'
+          import { prisma } from '@/lib/prisma'
+
+          export async function GET() {
+            try {
+              const items = await prisma.banner.findMany({
+                where: { isActive: true },
+                orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+              })
+              return NextResponse.json({ items })
+            } catch (e: any) {
+              return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
+            }
+          }
+          TS
+
+          # Главная: app/page.tsx
+          cat > src/app/page.tsx <<'TS'
+          import BannerCarousel from '@/components/BannerCarousel'
+          import Footer from '@/components/Footer'
+
+          export default async function HomePage() {
+            return (
+              <div className="bg-white">
+                <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
+                  {/* HERO */}
+                  <BannerCarousel />
+
+                  {/* 4 преимущества */}
+                  <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                      { title: 'Широкий ассортимент', text: 'Свежие поставки с мировых плантаций' },
+                      { title: 'Удобство заказа и доставки', text: 'От 1 коробки. Доставка по РФ' },
+                      { title: 'Конкурентные цены', text: 'Скидки и кэшбек для постоянных клиентов' },
+                      { title: 'Поддержка клиентов', text: 'Поможем подобрать и оформить заказ' },
+                    ].map((b, i) => (
+                      <div key={i} className="rounded-lg border p-4 bg-white">
+                        <div className="font-medium mb-1">{b.title}</div>
+                        <div className="text-gray-600 text-sm">{b.text}</div>
+                      </div>
+                    ))}
+                  </section>
+
+                  {/* Рекомендации — заглушка */}
+                  <section>
+                    <h2 className="text-xl font-semibold mb-4">Рекомендуем посмотреть</h2>
+                    <div className="grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="border rounded-lg p-4">
+                          <div className="aspect-square rounded bg-gray-100 mb-3" />
+                          <div className="font-medium">Товар #{i + 1}</div>
+                          <div className="text-sm text-gray-600">Описание товара</div>
+                          <button className="btn btn-primary mt-3 w-full">Заказать</button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+
+                <Footer />
+              </div>
+            )
+          }
+          TS
+
+          # Заглушка стилей, если app/layout.tsx импортирует './layout.css'
+          cat > src/app/layout.css <<'CSS'
+          /* Stub: используется только чтобы не было ошибки импорта './layout.css' */
+          CSS
+
+          # Пиксель‑заглушка для баннера
+          base64 -d > public/images/hero-fallback.png <<'B64'
+          iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=
+          B64
+
+      - name: Create patch branch and commit
+        id: commit
+        run: |
+          BRANCH="feat/landing-${{ github.run_id }}"
+          git switch -c "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nochanges=true" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          else
+            git commit -m "feat: landing skeleton (header, footer, banner, api, page)"
+            git push --set-upstream origin "$BRANCH"
+            echo "nochanges=false" >> $GITHUB_OUTPUT
+            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create pull request
+        if: steps.commit.outputs.nochanges == 'false'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: ${{ inputs.base }}
+          branch: ${{ steps.commit.outputs.branch }}
+          title: "feat: landing skeleton"
+          commit-message: "feat: landing skeleton (header, footer, banner, api, page)"
+          body: |
+            Auto-generated landing PR from workflow run **${{ github.run_id }}**.
+            Base: `${{ inputs.base }}`.
+
+      - name: No changes – nothing to PR
+        if: steps.commit.outputs.nochanges == 'true'
+        run: echo "Nothing changed, PR is not created."
