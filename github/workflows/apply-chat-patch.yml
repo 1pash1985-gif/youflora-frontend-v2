@@ -1,0 +1,34 @@
+name: Apply Chat Patch
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Target branch'
+        required: true
+        default: 'main'
+      patch:
+        description: 'Paste unified diff here (git diff -u)'
+        required: true
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+      - run: |
+          git config user.name "chat-bot"
+          git config user.email "bot@example.com"
+          echo "${{ github.event.inputs.patch }}" > _chat.patch
+          git apply --whitespace=fix _chat.patch || git apply --reject _chat.patch
+          git add -A
+          git commit -m "Apply chat patch ${{ github.run_id }}" || echo "nothing to commit"
+          BR="chat/patch-${{ github.run_id }}"
+          git push -u origin HEAD:$BR
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chat/patch-${{ github.run_id }}
+          base: ${{ github.event.inputs.branch }}
+          title: "Apply chat patch ${{ github.run_id }}"
+          body: "Patch applied from workflow input."
